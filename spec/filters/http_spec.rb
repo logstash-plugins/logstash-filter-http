@@ -31,7 +31,7 @@ describe LogStash::Filters::Http do
           if ecs_select.active_mode == :disabled
             expect(event.get('body')).to eq("Bom dia")
           else
-            expect(event.get('[http][request][body][content]')).to eql 'Bom dia'
+            expect(event.get('[http][response][body][content]')).to eql 'Bom dia'
           end
         end
 
@@ -49,7 +49,7 @@ describe LogStash::Filters::Http do
               expect(event.include?('[body]')).to be false
 
               # TODO: this is going to cause issues with an ECS template!?
-              expect(event.get('[http][request][body][content][id]')).to eq(10)
+              expect(event.get('[http][response][body][content][id]')).to eq(10)
             end
           end
 
@@ -133,22 +133,22 @@ describe LogStash::Filters::Http do
           expect(event.get('headers')).to include "X-Backend-Server" => "logstash.elastic.co"
         else
           expect(event.include?('headers')).to be false
-          expect(event.get('[@metadata][filter][http][request][headers]')).to include "Server" => "Apache"
-          expect(event.get('[@metadata][filter][http][request][headers]')).to include "X-Backend-Server" => "logstash.elastic.co"
+          expect(event.get('[@metadata][filter][http][response][headers]')).to include "Server" => "Apache"
+          expect(event.get('[@metadata][filter][http][response][headers]')).to include "X-Backend-Server" => "logstash.elastic.co"
         end
       end
 
       context 'with a headers target' do
 
-        let(:config) { super().merge "target_headers" => '[req][headers]' }
+        let(:config) { super().merge "target_headers" => '[res][headers]' }
 
         it "sets response headers in the event" do
           expect(subject).to receive(:request_http).with(anything, config['url'], anything).and_return(response)
 
           subject.filter(event)
 
-          expect(event.get('[req][headers]')).to include "Server" => "Apache"
-          expect(event.get('[req][headers]').keys).to include "Last-Modified"
+          expect(event.get('[res][headers]')).to include "Server" => "Apache"
+          expect(event.get('[res][headers]').keys).to include "Last-Modified"
         end
 
       end
