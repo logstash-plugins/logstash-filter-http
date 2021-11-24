@@ -1,3 +1,6 @@
+## 1.2.0
+  - Feat: improve ECS compatibility [#35](https://github.com/logstash-plugins/logstash-filter-http/pull/35)
+
 ## 1.1.0
   - Add support for PUT requests [#34](https://github.com/logstash-plugins/logstash-filter-http/pull/34)
 
