@@ -1,13 +1,21 @@
 # encoding: utf-8
 require 'logstash/filters/base'
+require 'logstash/json'
 require 'logstash/namespace'
 require 'logstash/plugin_mixins/http_client'
-require 'logstash/json'
+require 'logstash/plugin_mixins/ecs_compatibility_support'
+require 'logstash/plugin_mixins/ecs_compatibility_support/target_check'
+require 'logstash/plugin_mixins/validator_support/field_reference_validation_adapter'
 
 # Logstash HTTP Filter
 # This filter calls a defined URL and saves the answer into a specified field.
 #
 class LogStash::Filters::Http < LogStash::Filters::Base
+
+  include LogStash::PluginMixins::ECSCompatibilitySupport(:disabled, :v1, :v8 => :v1)
+
+  extend LogStash::PluginMixins::ValidatorSupport::FieldReferenceValidationAdapter
+
   include LogStash::PluginMixins::HttpClient
 
   config_name 'http'
@@ -21,8 +29,9 @@ class LogStash::Filters::Http < LogStash::Filters::Base
   config :body, :required => false
   config :body_format, :validate => ['text', 'json'], :default => "text"
 
-  config :target_body, :validate => :string, :default => "body"
-  config :target_headers, :validate => :string, :default => "headers"
+  config :target_body, :validate => :field_reference, :default => "body"
+  # default [headers] (legacy) or [@metadata][filter][http][request][headers] in ECS mode
+  config :target_headers, :validate => :field_reference
 
   # Append values to the `tags` field when there has been no
   # successful match or json parsing error
@@ -32,6 +41,8 @@ class LogStash::Filters::Http < LogStash::Filters::Base
   def register
     # nothing to see here
     @verb = verb.downcase
+
+    @target_headers ||= ecs_select[disabled: '[headers]', v1: '[@metadata][filter][http][request][headers]']
   end
 
   def filter(event)

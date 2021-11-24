@@ -1,4 +1,5 @@
 require 'logstash/devutils/rspec/spec_helper'
+require 'logstash/plugin_mixins/ecs_compatibility_support/spec_helper'
 require 'logstash/filters/http'
 
 describe LogStash::Filters::Http do
@@ -45,6 +46,7 @@ describe LogStash::Filters::Http do
       it "interpolates request url using event data" do
         expect(subject).to receive(:request_http).with(anything, "http://stringsize.com/test", anything).and_return(response)
         subject.filter(event)
+        expect(event.get('size')).to eql '4'
       end
     end
   end
@@ -68,26 +70,70 @@ describe LogStash::Filters::Http do
       expect(event.get('tags')).to include('_httprequestfailure')
     end
   end
-  describe "headers" do
+
+  describe "headers", :ecs_compatibility_support do
     before(:each) { subject.register }
-    let(:response) { [200, {}, "Bom dia"] }
-    context "when set" do
-      let(:headers) { { "Cache-Control" => "nocache" } }
-      let(:config) do
-        {
-          "url" => "http://stringsize.com",
-          "target_body" => "size",
-          "headers" => headers
-        }
+    let(:response) do
+      response_headers = {
+          'Server' => 'Apache',
+          'Last-Modified' => 'Mon, 18 Jul 2016 02:36:04 GMT',
+          'X-Backend-Server' => 'logstash.elastic.co',
+      }
+      [200, response_headers, "Bom dia"]
+    end
+
+    let(:config) { { "url" => "http://stringsize.com" } }
+
+    ecs_compatibility_matrix(:disabled, :v1) do |ecs_select|
+
+      let(:config) { super().merge "ecs_compatibility" => ecs_compatibility }
+
+      it "sets response headers in the event" do
+        expect(subject).to receive(:request_http).with(anything, config['url'], anything).and_return(response)
+
+        subject.filter(event)
+
+        if ecs_select.active_mode == :disabled
+          expect(event.get('headers')).to include "Server" => "Apache"
+          expect(event.get('headers')).to include "X-Backend-Server" => "logstash.elastic.co"
+        else
+          expect(event.include?('headers')).to be false
+          expect(event.get('[@metadata][filter][http][request][headers]')).to include "Server" => "Apache"
+          expect(event.get('[@metadata][filter][http][request][headers]')).to include "X-Backend-Server" => "logstash.elastic.co"
+        end
       end
+
+      context 'with a headers target' do
+
+        let(:config) { super().merge "target_headers" => '[req][headers]' }
+
+        it "sets response headers in the event" do
+          expect(subject).to receive(:request_http).with(anything, config['url'], anything).and_return(response)
+
+          subject.filter(event)
+
+          expect(event.get('[req][headers]')).to include "Server" => "Apache"
+          expect(event.get('[req][headers]').keys).to include "Last-Modified"
+        end
+
+      end
+
+    end
+
+    context "(extra) request headers" do
+      let(:headers) { { "Cache-Control" => "nocache" } }
+      let(:config) { super().merge "headers" => headers }
+
       it "are included in the request" do
         expect(subject).to receive(:request_http) do |verb, url, options|
-          expect(options.fetch(:headers, {})).to include(headers)
+          expect( options.fetch(:headers, {}) ).to include(headers)
         end.and_return(response)
+
         subject.filter(event)
       end
     end
   end
+
   describe "query string parameters" do
     before(:each) { subject.register }
     let(:response) { [200, {}, "Bom dia"] }
@@ -96,7 +142,6 @@ describe LogStash::Filters::Http do
       let(:config) do
         {
           "url" => "http://stringsize.com/%{message}",
-          "target_body" => "size",
           "query" => query
         }
       end
