@@ -7,34 +7,69 @@ describe LogStash::Filters::Http do
   let(:event) { LogStash::Event.new(data) }
   let(:data) { { "message" => "test" } }
 
-  describe 'response body handling' do
-    before(:each) { subject.register }
+  describe 'response body handling', :ecs_compatibility_support do
+
     let(:url) { 'http://laceholder.typicode.com/users/10' }
-    let(:config) do
-      { "url" => url, "target_body" => 'rest' }
-    end
+    let(:config) { { "url" => url } }
+
     before(:each) do
+      subject.register
+
       allow(subject).to receive(:request_http).and_return(response)
       subject.filter(event)
     end
 
-    context "when body is text" do
+    ecs_compatibility_matrix(:disabled, :v1) do |ecs_select|
+
+      let(:config) { super().merge "ecs_compatibility" => ecs_compatibility }
+
       let(:response) { [200, {}, "Bom dia"] }
 
-      it "fetches and writes body to target" do
-        expect(event.get('rest')).to eq("Bom dia")
-      end
-    end
-    context "when body is JSON" do
-      context "and headers are set correctly" do
-        let(:response) { [200, {"content-type" => "application/json"}, "{\"id\": 10}"] }
+      context "when body is text" do
 
         it "fetches and writes body to target" do
-          expect(event.get('[rest][id]')).to eq(10)
+          if ecs_select.active_mode == :disabled
+            expect(event.get('body')).to eq("Bom dia")
+          else
+            expect(event.get('[http][request][body][content]')).to eql 'Bom dia'
+          end
+        end
+
+      end
+
+      context "when body is JSON" do
+        context "and headers are set correctly" do
+
+          let(:response) { [200, {"content-type" => "application/json"}, "{\"id\": 10}"] }
+
+          it "fetches and writes body to target" do
+            if ecs_select.active_mode == :disabled
+              expect(event.get('[body][id]')).to eq(10)
+            else
+              expect(event.include?('[body]')).to be false
+
+              # TODO: this is going to cause issues with an ECS template!?
+              expect(event.get('[http][request][body][content][id]')).to eq(10)
+            end
+          end
+
         end
       end
+
+      context 'with body target' do
+
+        let(:config) { super().merge "target_body" => '[rest]' }
+
+        it "fetches and writes body to target" do
+          expect(event.get('rest')).to eq("Bom dia")
+          expect(event.include?('body')).to be false
+        end
+
+      end
+
     end
   end
+
   describe 'URL parameter' do
     before(:each) { subject.register }
     context "when url contains field references" do
@@ -239,7 +274,6 @@ describe LogStash::Filters::Http do
       {
         "verb" => verb,
         "url" => "http://stringsize.com",
-        "target_body" => "size"
       }
     end
     ["GET", "HEAD", "POST", "DELETE", "PATCH", "PUT"].each do |verb_string|

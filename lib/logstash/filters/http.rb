@@ -29,7 +29,8 @@ class LogStash::Filters::Http < LogStash::Filters::Base
   config :body, :required => false
   config :body_format, :validate => ['text', 'json'], :default => "text"
 
-  config :target_body, :validate => :field_reference, :default => "body"
+  # default [body] (legacy) or [http][request][body][content] in ECS mode
+  config :target_body, :validate => :field_reference
   # default [headers] (legacy) or [@metadata][filter][http][request][headers] in ECS mode
   config :target_headers, :validate => :field_reference
 
@@ -42,6 +43,7 @@ class LogStash::Filters::Http < LogStash::Filters::Base
     # nothing to see here
     @verb = verb.downcase
 
+    @target_body ||= ecs_select[disabled: '[body]', v1: '[http][request][body][content]']
     @target_headers ||= ecs_select[disabled: '[headers]', v1: '[@metadata][filter][http][request][headers]']
   end
 
