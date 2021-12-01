@@ -29,7 +29,7 @@ class LogStash::Filters::Http < LogStash::Filters::Base
   config :body, :required => false
   config :body_format, :validate => ['text', 'json'], :default => "text"
 
-  # default [body] (legacy) or [http][response][body][content] in ECS mode
+  # default [body] (legacy) required to be specified in ECS mode
   config :target_body, :validate => :field_reference
   # default [headers] (legacy) or [@metadata][filter][http][response][headers] in ECS mode
   config :target_headers, :validate => :field_reference
@@ -39,12 +39,21 @@ class LogStash::Filters::Http < LogStash::Filters::Base
   config :tag_on_request_failure, :validate => :array, :default => ['_httprequestfailure']
   config :tag_on_json_failure, :validate => :array, :default => ['_jsonparsefailure']
 
+  def initialize(*params)
+    super
+
+    @target_body ||= ecs_select[disabled: '[body]', v1: false]
+    if @target_body.eql? false # user needs to specify target in ECS mode
+      @logger.error missing_config_message(:target_body)
+      raise LogStash::ConfigurationError.new "Wrong configuration (in ecs_compatibility mode #{ecs_compatibility.inspect})"
+    end
+
+    @target_headers ||= ecs_select[disabled: '[headers]', v1: '[@metadata][filter][http][response][headers]']
+  end
+
   def register
     # nothing to see here
     @verb = verb.downcase
-
-    @target_body ||= ecs_select[disabled: '[body]', v1: '[http][response][body][content]']
-    @target_headers ||= ecs_select[disabled: '[headers]', v1: '[@metadata][filter][http][response][headers]']
   end
 
   def filter(event)
@@ -92,6 +101,20 @@ class LogStash::Filters::Http < LogStash::Filters::Base
   end # def filter
 
   private
+
+  def missing_config_message(name)
+    <<-EOF
+Missing a required setting for the http filter plugin:
+
+  filter {
+    http {
+      #{name} => # SETTING MISSING
+      ...
+    }
+  }
+EOF
+  end
+
   def request_http(verb, url, options = {})
     response = client.http(verb, url, options)
     [response.code, response.headers, response.body]

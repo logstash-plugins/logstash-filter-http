@@ -26,7 +26,7 @@ The HTTP filter provides integration with external web services/REST APIs.
 ==== Compatibility with the Elastic Common Schema (ECS)
 
 The plugin includes sensible defaults that change based on <<plugins-{type}s-{plugin}-ecs_compatibility,ECS compatibility mode>>.
-When targeting an ECS version, headers are set as `@metadata` and the response body is set according to ECS.
+When targeting an ECS version, headers are set as `@metadata` and the `target_body` is a required option.
 See <<plugins-{type}s-{plugin}-target_body>>, and <<plugins-{type}s-{plugin}-target_headers>>.
 
 
@@ -137,10 +137,9 @@ Define the query string parameters (key-value pairs) to be sent in the HTTP requ
 ===== `target_body`
 
   * Value type is <<hash,hash>>
-  * There is no default value
   * Default value depends on whether <<plugins-{type}s-{plugin}-ecs_compatibility>> is enabled:
     ** ECS Compatibility disabled: `"[body]"
-    ** ECS Compatibility enabled: `"[http][response][body][content]"
+    ** ECS Compatibility enabled: no default value, needs to be specified explicitly
 
 Define the target field for placing the body of the HTTP response.
 

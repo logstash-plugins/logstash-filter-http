@@ -7,10 +7,36 @@ describe LogStash::Filters::Http do
   let(:event) { LogStash::Event.new(data) }
   let(:data) { { "message" => "test" } }
 
+  let(:url) { 'https://a-non-existent.url1' }
+  let(:config) { { "url" => url, 'target_body' => '[the][body]' } }
+
+  let(:response) { [200, {}, "Bom dia"] }
+
+  describe 'target_body default', :ecs_compatibility_support do
+
+    let(:config) { { "url" => url, "ecs_compatibility" => ecs_compatibility } }
+
+    ecs_compatibility_matrix(:disabled, :v1) do |ecs_select|
+
+      it "has a default body_target (in legacy mode)" do
+        subject.register
+        allow(subject).to receive(:request_http).and_return(response)
+        subject.filter(event)
+
+        expect(event.get('body')).to eq("Bom dia")
+      end if ecs_select.active_mode == :disabled
+
+      it "fails due missing body_target (in ECS mode)" do
+        expect { subject }.to raise_error(LogStash::ConfigurationError)
+      end if ecs_select.active_mode != :disabled
+
+    end
+
+  end
+
   describe 'response body handling', :ecs_compatibility_support do
 
     let(:url) { 'http://laceholder.typicode.com/users/10' }
-    let(:config) { { "url" => url } }
 
     before(:each) do
       subject.register
@@ -19,23 +45,9 @@ describe LogStash::Filters::Http do
       subject.filter(event)
     end
 
-    ecs_compatibility_matrix(:disabled, :v1) do |ecs_select|
+    ecs_compatibility_matrix(:disabled, :v1) do
 
-      let(:config) { super().merge "ecs_compatibility" => ecs_compatibility }
-
-      let(:response) { [200, {}, "Bom dia"] }
-
-      context "when body is text" do
-
-        it "fetches and writes body to target" do
-          if ecs_select.active_mode == :disabled
-            expect(event.get('body')).to eq("Bom dia")
-          else
-            expect(event.get('[http][response][body][content]')).to eql 'Bom dia'
-          end
-        end
-
-      end
+      let(:config) { super().merge "ecs_compatibility" => ecs_compatibility, 'target_body' => 'gw-response' }
 
       context "when body is JSON" do
         context "and headers are set correctly" do
@@ -43,14 +55,7 @@ describe LogStash::Filters::Http do
           let(:response) { [200, {"content-type" => "application/json"}, "{\"id\": 10}"] }
 
           it "fetches and writes body to target" do
-            if ecs_select.active_mode == :disabled
-              expect(event.get('[body][id]')).to eq(10)
-            else
-              expect(event.include?('[body]')).to be false
-
-              # TODO: this is going to cause issues with an ECS template!?
-              expect(event.get('[http][response][body][content][id]')).to eq(10)
-            end
+            expect(event.get('[gw-response][id]')).to eq(10)
           end
 
         end
@@ -117,7 +122,7 @@ describe LogStash::Filters::Http do
       [200, response_headers, "Bom dia"]
     end
 
-    let(:config) { { "url" => "http://stringsize.com" } }
+    let(:url) { "http://stringsize.com" }
 
     ecs_compatibility_matrix(:disabled, :v1) do |ecs_select|
 
