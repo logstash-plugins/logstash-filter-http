@@ -16,7 +16,7 @@ describe LogStash::Filters::Http do
 
     let(:config) { { "url" => url, "ecs_compatibility" => ecs_compatibility } }
 
-    ecs_compatibility_matrix(:disabled, :v1) do |ecs_select|
+    ecs_compatibility_matrix(:disabled, :v1, :v8) do |ecs_select|
 
       it "has a default body_target (in legacy mode)" do
         subject.register
@@ -45,7 +45,7 @@ describe LogStash::Filters::Http do
       subject.filter(event)
     end
 
-    ecs_compatibility_matrix(:disabled, :v1) do
+    ecs_compatibility_matrix(:disabled, :v1, :v8) do
 
       let(:config) { super().merge "ecs_compatibility" => ecs_compatibility, 'target_body' => 'gw-response' }
 
@@ -179,12 +179,8 @@ describe LogStash::Filters::Http do
     let(:response) { [200, {}, "Bom dia"] }
     context "when set" do
       let(:query) { { "color" => "green" } }
-      let(:config) do
-        {
-          "url" => "http://stringsize.com/%{message}",
-          "query" => query
-        }
-      end
+      let(:config) { super().merge "query" => query }
+
       it "are included in the request" do
         expect(subject).to receive(:request_http).with(anything, anything, include(:query => query)).and_return(response)
         subject.filter(event)
@@ -194,21 +190,11 @@ describe LogStash::Filters::Http do
   describe "request body" do
     before(:each) { subject.register }
     let(:response) { [200, {}, "Bom dia"] }
-    let(:config) do
-      {
-        "url" => "http://stringsize.com",
-        "body" => body
-      }
-    end
+    let(:url) { "http://stringsize.com" }
+    let(:config) { super().merge "body" => body }
 
     describe "format" do
-      let(:config) do
-        {
-          "url" => "http://stringsize.com",
-          "body_format" => body_format,
-          "body" => body
-        }
-      end
+      let(:config) { super().merge "body_format" => body_format, "body" => body }
 
       context "when is json" do
         let(:body_format) { "json" }
@@ -275,12 +261,8 @@ describe LogStash::Filters::Http do
   end
   describe "verb" do
     let(:response) { [200, {}, "Bom dia"] }
-    let(:config) do
-      {
-        "verb" => verb,
-        "url" => "http://stringsize.com",
-      }
-    end
+    let(:config) { super().merge "verb" => verb }
+
     ["GET", "HEAD", "POST", "DELETE", "PATCH", "PUT"].each do |verb_string|
       let(:verb) { verb_string }
       context "when verb #{verb_string} is set" do
