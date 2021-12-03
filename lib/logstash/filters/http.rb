@@ -12,7 +12,7 @@ class LogStash::Filters::Http < LogStash::Filters::Base
 
   config_name 'http'
 
-  VALID_VERBS = ['GET', 'HEAD', 'PATCH', 'DELETE', 'POST']
+  VALID_VERBS = ['GET', 'HEAD', 'PATCH', 'DELETE', 'POST', 'PUT']
 
   config :url, :validate => :string, :required => true
   config :verb, :validate => VALID_VERBS, :required => false, :default => 'GET'

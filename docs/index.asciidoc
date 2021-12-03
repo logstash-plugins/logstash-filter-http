@@ -135,7 +135,7 @@ The URL to send the request to. The value can be fetched from event fields.
 [id="plugins-{type}s-{plugin}-verb"]
 ===== `verb`
 
-  * Value type can be either `"GET"`, `"HEAD"`, `"PATCH"`, `"DELETE"`, `"POST"`
+  * Value type can be either `"GET"`, `"HEAD"`, `"PATCH"`, `"DELETE"`, `"POST"`, `"PUT"`
   * Default value is `"GET"`
 
 The verb to be used for the HTTP request.
