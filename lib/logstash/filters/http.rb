@@ -1,13 +1,21 @@
 # encoding: utf-8
 require 'logstash/filters/base'
+require 'logstash/json'
 require 'logstash/namespace'
 require 'logstash/plugin_mixins/http_client'
-require 'logstash/json'
+require 'logstash/plugin_mixins/ecs_compatibility_support'
+require 'logstash/plugin_mixins/ecs_compatibility_support/target_check'
+require 'logstash/plugin_mixins/validator_support/field_reference_validation_adapter'
 
 # Logstash HTTP Filter
 # This filter calls a defined URL and saves the answer into a specified field.
 #
 class LogStash::Filters::Http < LogStash::Filters::Base
+
+  include LogStash::PluginMixins::ECSCompatibilitySupport(:disabled, :v1, :v8 => :v1)
+
+  extend LogStash::PluginMixins::ValidatorSupport::FieldReferenceValidationAdapter
+
   include LogStash::PluginMixins::HttpClient
 
   config_name 'http'
@@ -21,13 +29,27 @@ class LogStash::Filters::Http < LogStash::Filters::Base
   config :body, :required => false
   config :body_format, :validate => ['text', 'json'], :default => "text"
 
-  config :target_body, :validate => :string, :default => "body"
-  config :target_headers, :validate => :string, :default => "headers"
+  # default [body] (legacy) required to be specified in ECS mode
+  config :target_body, :validate => :field_reference
+  # default [headers] (legacy) or [@metadata][filter][http][response][headers] in ECS mode
+  config :target_headers, :validate => :field_reference
 
   # Append values to the `tags` field when there has been no
   # successful match or json parsing error
   config :tag_on_request_failure, :validate => :array, :default => ['_httprequestfailure']
   config :tag_on_json_failure, :validate => :array, :default => ['_jsonparsefailure']
+
+  def initialize(*params)
+    super
+
+    @target_body ||= ecs_select[disabled: '[body]', v1: false]
+    if @target_body.eql? false # user needs to specify target in ECS mode
+      @logger.error missing_config_message(:target_body)
+      raise LogStash::ConfigurationError.new "Wrong configuration (in ecs_compatibility mode #{ecs_compatibility.inspect})"
+    end
+
+    @target_headers ||= ecs_select[disabled: '[headers]', v1: '[@metadata][filter][http][response][headers]']
+  end
 
   def register
     # nothing to see here
@@ -79,6 +101,20 @@ class LogStash::Filters::Http < LogStash::Filters::Base
   end # def filter
 
   private
+
+  def missing_config_message(name)
+    <<-EOF
+Missing a required setting for the http filter plugin:
+
+  filter {
+    http {
+      #{name} => # SETTING MISSING
+      ...
+    }
+  }
+EOF
+  end
+
   def request_http(verb, url, options = {})
     response = client.http(verb, url, options)
     [response.code, response.headers, response.body]

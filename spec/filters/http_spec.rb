@@ -1,4 +1,5 @@
 require 'logstash/devutils/rspec/spec_helper'
+require 'logstash/plugin_mixins/ecs_compatibility_support/spec_helper'
 require 'logstash/filters/http'
 
 describe LogStash::Filters::Http do
@@ -6,34 +7,74 @@ describe LogStash::Filters::Http do
   let(:event) { LogStash::Event.new(data) }
   let(:data) { { "message" => "test" } }
 
-  describe 'response body handling' do
-    before(:each) { subject.register }
-    let(:url) { 'http://laceholder.typicode.com/users/10' }
-    let(:config) do
-      { "url" => url, "target_body" => 'rest' }
+  let(:url) { 'https://a-non-existent.url1' }
+  let(:config) { { "url" => url, 'target_body' => '[the][body]' } }
+
+  let(:response) { [200, {}, "Bom dia"] }
+
+  describe 'target_body default', :ecs_compatibility_support do
+
+    let(:config) { { "url" => url, "ecs_compatibility" => ecs_compatibility } }
+
+    ecs_compatibility_matrix(:disabled, :v1, :v8) do |ecs_select|
+
+      it "has a default body_target (in legacy mode)" do
+        subject.register
+        allow(subject).to receive(:request_http).and_return(response)
+        subject.filter(event)
+
+        expect(event.get('body')).to eq("Bom dia")
+      end if ecs_select.active_mode == :disabled
+
+      it "fails due missing body_target (in ECS mode)" do
+        expect { subject }.to raise_error(LogStash::ConfigurationError)
+      end if ecs_select.active_mode != :disabled
+
     end
+
+  end
+
+  describe 'response body handling', :ecs_compatibility_support do
+
+    let(:url) { 'http://laceholder.typicode.com/users/10' }
+
     before(:each) do
+      subject.register
+
       allow(subject).to receive(:request_http).and_return(response)
       subject.filter(event)
     end
 
-    context "when body is text" do
-      let(:response) { [200, {}, "Bom dia"] }
+    ecs_compatibility_matrix(:disabled, :v1, :v8) do
 
-      it "fetches and writes body to target" do
-        expect(event.get('rest')).to eq("Bom dia")
-      end
-    end
-    context "when body is JSON" do
-      context "and headers are set correctly" do
-        let(:response) { [200, {"content-type" => "application/json"}, "{\"id\": 10}"] }
+      let(:config) { super().merge "ecs_compatibility" => ecs_compatibility, 'target_body' => 'gw-response' }
 
-        it "fetches and writes body to target" do
-          expect(event.get('[rest][id]')).to eq(10)
+      context "when body is JSON" do
+        context "and headers are set correctly" do
+
+          let(:response) { [200, {"content-type" => "application/json"}, "{\"id\": 10}"] }
+
+          it "fetches and writes body to target" do
+            expect(event.get('[gw-response][id]')).to eq(10)
+          end
+
         end
       end
+
+      context 'with body target' do
+
+        let(:config) { super().merge "target_body" => '[rest]' }
+
+        it "fetches and writes body to target" do
+          expect(event.get('rest')).to eq("Bom dia")
+          expect(event.include?('body')).to be false
+        end
+
+      end
+
     end
   end
+
   describe 'URL parameter' do
     before(:each) { subject.register }
     context "when url contains field references" do
@@ -45,6 +86,7 @@ describe LogStash::Filters::Http do
       it "interpolates request url using event data" do
         expect(subject).to receive(:request_http).with(anything, "http://stringsize.com/test", anything).and_return(response)
         subject.filter(event)
+        expect(event.get('size')).to eql '4'
       end
     end
   end
@@ -68,38 +110,77 @@ describe LogStash::Filters::Http do
       expect(event.get('tags')).to include('_httprequestfailure')
     end
   end
-  describe "headers" do
+
+  describe "headers", :ecs_compatibility_support do
     before(:each) { subject.register }
-    let(:response) { [200, {}, "Bom dia"] }
-    context "when set" do
-      let(:headers) { { "Cache-Control" => "nocache" } }
-      let(:config) do
-        {
-          "url" => "http://stringsize.com",
-          "target_body" => "size",
-          "headers" => headers
-        }
+    let(:response) do
+      response_headers = {
+          'Server' => 'Apache',
+          'Last-Modified' => 'Mon, 18 Jul 2016 02:36:04 GMT',
+          'X-Backend-Server' => 'logstash.elastic.co',
+      }
+      [200, response_headers, "Bom dia"]
+    end
+
+    let(:url) { "http://stringsize.com" }
+
+    ecs_compatibility_matrix(:disabled, :v1) do |ecs_select|
+
+      let(:config) { super().merge "ecs_compatibility" => ecs_compatibility }
+
+      it "sets response headers in the event" do
+        expect(subject).to receive(:request_http).with(anything, config['url'], anything).and_return(response)
+
+        subject.filter(event)
+
+        if ecs_select.active_mode == :disabled
+          expect(event.get('headers')).to include "Server" => "Apache"
+          expect(event.get('headers')).to include "X-Backend-Server" => "logstash.elastic.co"
+        else
+          expect(event.include?('headers')).to be false
+          expect(event.get('[@metadata][filter][http][response][headers]')).to include "Server" => "Apache"
+          expect(event.get('[@metadata][filter][http][response][headers]')).to include "X-Backend-Server" => "logstash.elastic.co"
+        end
       end
+
+      context 'with a headers target' do
+
+        let(:config) { super().merge "target_headers" => '[res][headers]' }
+
+        it "sets response headers in the event" do
+          expect(subject).to receive(:request_http).with(anything, config['url'], anything).and_return(response)
+
+          subject.filter(event)
+
+          expect(event.get('[res][headers]')).to include "Server" => "Apache"
+          expect(event.get('[res][headers]').keys).to include "Last-Modified"
+        end
+
+      end
+
+    end
+
+    context "(extra) request headers" do
+      let(:headers) { { "Cache-Control" => "nocache" } }
+      let(:config) { super().merge "headers" => headers }
+
       it "are included in the request" do
         expect(subject).to receive(:request_http) do |verb, url, options|
-          expect(options.fetch(:headers, {})).to include(headers)
+          expect( options.fetch(:headers, {}) ).to include(headers)
         end.and_return(response)
+
         subject.filter(event)
       end
     end
   end
+
   describe "query string parameters" do
     before(:each) { subject.register }
     let(:response) { [200, {}, "Bom dia"] }
     context "when set" do
       let(:query) { { "color" => "green" } }
-      let(:config) do
-        {
-          "url" => "http://stringsize.com/%{message}",
-          "target_body" => "size",
-          "query" => query
-        }
-      end
+      let(:config) { super().merge "query" => query }
+
       it "are included in the request" do
         expect(subject).to receive(:request_http).with(anything, anything, include(:query => query)).and_return(response)
         subject.filter(event)
@@ -109,21 +190,11 @@ describe LogStash::Filters::Http do
   describe "request body" do
     before(:each) { subject.register }
     let(:response) { [200, {}, "Bom dia"] }
-    let(:config) do
-      {
-        "url" => "http://stringsize.com",
-        "body" => body
-      }
-    end
+    let(:url) { "http://stringsize.com" }
+    let(:config) { super().merge "body" => body }
 
     describe "format" do
-      let(:config) do
-        {
-          "url" => "http://stringsize.com",
-          "body_format" => body_format,
-          "body" => body
-        }
-      end
+      let(:config) { super().merge "body_format" => body_format, "body" => body }
 
       context "when is json" do
         let(:body_format) { "json" }
@@ -190,13 +261,8 @@ describe LogStash::Filters::Http do
   end
   describe "verb" do
     let(:response) { [200, {}, "Bom dia"] }
-    let(:config) do
-      {
-        "verb" => verb,
-        "url" => "http://stringsize.com",
-        "target_body" => "size"
-      }
-    end
+    let(:config) { super().merge "verb" => verb }
+
     ["GET", "HEAD", "POST", "DELETE", "PATCH", "PUT"].each do |verb_string|
       let(:verb) { verb_string }
       context "when verb #{verb_string} is set" do
