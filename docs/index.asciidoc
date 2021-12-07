@@ -95,10 +95,10 @@ The body of the HTTP request to be sent.
 [id="plugins-{type}s-{plugin}-body_format"]
 ===== `body_format`
 
-  * Value type can be either `"json"` or `"text"`
+  * Value type can be either `"json"`, `"form"`, or `"text"`
   * Default value is `"text"`
 
-If set to `"json"` the body will be serialized as JSON. Otherwise it is sent as is.
+If set to `"json"` the body will be serialized as JSON and the content-type header will be set to `application/json`. If set to `"form"`, the content-type header will be set to `application/x-www-form-urlencoded`. Otherwise it is sent as is with the content-type header set to `text/plain`.
 
 [id="plugins-{type}s-{plugin}-ecs_compatibility"]
 ===== `ecs_compatibility`

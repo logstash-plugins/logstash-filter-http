@@ -27,7 +27,7 @@ class LogStash::Filters::Http < LogStash::Filters::Base
   config :headers, :validate => :hash, :required => false, :default => {}
   config :query, :validate => :hash, :required => false, :default => {}
   config :body, :required => false
-  config :body_format, :validate => ['text', 'json'], :default => "text"
+  config :body_format, :validate => ['text', 'json', 'form'], :default => "text"
 
   # default [body] (legacy) required to be specified in ECS mode
   config :target_body, :validate => :field_reference
@@ -61,6 +61,8 @@ class LogStash::Filters::Http < LogStash::Filters::Base
     headers_sprintfed = sprintf_object(event, @headers)
     if body_format == "json"
       headers_sprintfed["content-type"] = "application/json"
+    elsif body_format == "form"
+      headers_sprintfed["content-type"] = "application/x-www-form-urlencoded"
     else
       headers_sprintfed["content-type"] = "text/plain"
     end
