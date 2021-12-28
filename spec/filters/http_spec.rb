@@ -209,12 +209,14 @@ describe LogStash::Filters::Http do
           end.and_return(response)
           subject.filter(event)
         end
+
         it "sets content-type to application/json" do
           expect(subject).to receive(:request_http) do |verb, url, options|
             expect(options).to include(:headers => { "content-type" => "application/json"})
           end.and_return(response)
           subject.filter(event)
         end
+
       end
       context "when is text" do
         let(:body_format) { "text" }
@@ -226,12 +228,29 @@ describe LogStash::Filters::Http do
           end.and_return(response)
           subject.filter(event)
         end
+
         it "sets content-type to text/plain" do
           expect(subject).to receive(:request_http) do |verb, url, options|
             expect(options).to include(:headers => { "content-type" => "text/plain"})
           end.and_return(response)
           subject.filter(event)
         end
+
+        context 'content-type header present' do
+
+          let(:config) { super().merge 'headers' => { 'X-UA' => 'FOO', 'Content-Type' => 'application/x-www-form-urlencoded' } }
+
+          it "respects set header and does not add another" do
+            expect(subject).to receive(:request_http) do |verb, url, options|
+              headers = options[:headers]
+              expect(headers).to include("Content-Type" => "application/x-www-form-urlencoded")
+              expect(headers).to_not include("content-type")
+            end.and_return(response)
+            subject.filter(event)
+          end
+
+        end
+
       end
     end
     context "when using field references" do
