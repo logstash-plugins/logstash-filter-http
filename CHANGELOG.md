@@ -1,3 +1,6 @@
+## 1.2.1
+  - Fix: do not set content-type if provided by user [#36](https://github.com/logstash-plugins/logstash-filter-http/pull/36)
+
 ## 1.2.0
   - Feat: improve ECS compatibility [#35](https://github.com/logstash-plugins/logstash-filter-http/pull/35)
 
