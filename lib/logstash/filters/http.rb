@@ -59,10 +59,8 @@ class LogStash::Filters::Http < LogStash::Filters::Base
   def filter(event)
     url_for_event = event.sprintf(@url)
     headers_sprintfed = sprintf_object(event, @headers)
-    if body_format == "json"
-      headers_sprintfed["content-type"] = "application/json"
-    else
-      headers_sprintfed["content-type"] = "text/plain"
+    if !headers_sprintfed.key?('content-type') && !headers_sprintfed.key?('Content-Type')
+      headers_sprintfed['content-type'] = @body_format == "json" ? "application/json" : "text/plain"
     end
     query_sprintfed = sprintf_object(event, @query)
     body_sprintfed = sprintf_object(event, @body)
