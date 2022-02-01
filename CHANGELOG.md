@@ -1,3 +1,6 @@
+## 1.3.0
+  - Feat: support ssl_verification_mode option [#37](https://github.com/logstash-plugins/logstash-filter-http/pull/37)
+
 ## 1.2.1
   - Fix: do not set content-type if provided by user [#36](https://github.com/logstash-plugins/logstash-filter-http/pull/36)
 
