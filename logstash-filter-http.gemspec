@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name = 'logstash-filter-http'
-  s.version = '1.2.1'
+  s.version = '1.3.0'
   s.licenses = ['Apache License (2.0)']
   s.summary = 'This filter requests data from a RESTful Web Service.'
   s.description = 'This gem is a logstash plugin required to be installed on top of the Logstash core pipeline using $LS_HOME/bin/logstash-plugin install logstash-filter-http. This gem is not a stand-alone program'
@@ -28,7 +28,7 @@ Gem::Specification.new do |s|
   # Gem dependencies
   s.add_runtime_dependency 'logstash-core-plugin-api', '>= 1.60', '<= 2.99'
   s.add_runtime_dependency 'logstash-mixin-ecs_compatibility_support', '~>1.2'
-  s.add_runtime_dependency 'logstash-mixin-http_client', '>= 5.0.0', '< 9.0.0'
+  s.add_runtime_dependency "logstash-mixin-http_client", ">= 7.1.0", '< 9.0.0'
   s.add_runtime_dependency 'logstash-mixin-validator_support', '~> 1.0'
 
   s.add_development_dependency 'logstash-devutils'
