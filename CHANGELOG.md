@@ -1,3 +1,6 @@
+## 1.4.0
+  - Feat: added ssl_supported_protocols option [#38](https://github.com/logstash-plugins/logstash-filter-http/pull/38)
+ 
 ## 1.3.0
   - Feat: support ssl_verification_mode option [#37](https://github.com/logstash-plugins/logstash-filter-http/pull/37)
 
