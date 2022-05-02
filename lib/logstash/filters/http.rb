@@ -93,7 +93,9 @@ class LogStash::Filters::Http < LogStash::Filters::Base
     else
       @logger.debug? && @logger.debug('success received',
                                       :code => code, :body => response_body)
-      process_response(response_body, response_headers, event)
+#       Since no response body will be present for HEAD request
+      if @verb != 'HEAD'
+        process_response(response_body, response_headers, event)
       filter_matched(event)
     end
   end # def filter
