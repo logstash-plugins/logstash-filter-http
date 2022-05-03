@@ -93,9 +93,7 @@ class LogStash::Filters::Http < LogStash::Filters::Base
     else
       @logger.debug? && @logger.debug('success received',
                                       :code => code, :body => response_body)
-#       Since no response body will be present for HEAD request
-      if @verb != 'HEAD'
-        process_response(response_body, response_headers, event)
+      process_response(response_body, response_headers, event)
       filter_matched(event)
     end
   end # def filter
@@ -136,6 +134,7 @@ EOF
   def process_response(body, headers, event)
     content_type, _ = headers.fetch("content-type", "").split(";")
     event.set(@target_headers, headers)
+    return if @verb == 'HEAD' # Since 'HEAD' will not contain body, we need to set only header
     if content_type == "application/json"
       begin
         parsed = LogStash::Json.load(body)
