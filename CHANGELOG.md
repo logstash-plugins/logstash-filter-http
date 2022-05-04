@@ -1,3 +1,6 @@
+## 1.4.1
+  - Fix: don't process response body for HEAD requests [#40](https://github.com/logstash-plugins/logstash-filter-http/pull/40)
+
 ## 1.4.0
   - Feat: added ssl_supported_protocols option [#38](https://github.com/logstash-plugins/logstash-filter-http/pull/38)
  

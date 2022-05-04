@@ -191,7 +191,6 @@ describe LogStash::Filters::Http do
     before(:each) { subject.register }
     let(:response) { [200, {}, "Bom dia"] }
     let(:url) { "http://stringsize.com" }
-    let(:config) { super().merge "body" => body }
 
     describe "format" do
       let(:config) { super().merge "body_format" => body_format, "body" => body }
@@ -275,6 +274,16 @@ describe LogStash::Filters::Http do
           expect(body.fetch("mykey")).to eq(["normal value", "another_value", { "key" => "other-value2" }])
         end.and_return(response)
         subject.filter(event)
+      end
+    end
+    context "when the verb is HEAD" do
+      let(:config) { super().merge("verb" => "HEAD") }
+      before(:each) do
+        allow(subject).to receive(:request_http).and_return(response)
+      end
+      it "does not include the body" do
+        subject.filter(event)
+        expect(event).to_not include("body")
       end
     end
   end
