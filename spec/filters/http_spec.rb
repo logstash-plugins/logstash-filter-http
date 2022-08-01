@@ -109,6 +109,10 @@ describe LogStash::Filters::Http do
       expect(event).to_not include('rest')
       expect(event.get('tags')).to include('_httprequestfailure')
     end
+
+    it 'stores the HTTP status in the associated target' do
+      expect(event.get('[@metadata][filter][http][response][status_code]')).to eq(404)
+    end
   end
 
   describe "headers", :ecs_compatibility_support do
@@ -141,6 +145,8 @@ describe LogStash::Filters::Http do
           expect(event.get('[@metadata][filter][http][response][headers]')).to include "Server" => "Apache"
           expect(event.get('[@metadata][filter][http][response][headers]')).to include "X-Backend-Server" => "logstash.elastic.co"
         end
+
+        expect(event.get('[@metadata][filter][http][response][status_code]')).to eq(200)
       end
 
       context 'with a headers target' do
@@ -156,6 +162,18 @@ describe LogStash::Filters::Http do
           expect(event.get('[res][headers]').keys).to include "Last-Modified"
         end
 
+      end
+
+      context 'with a status target' do
+        let(:config) { super().merge("target_status" => '[res][status]') }
+
+        it 'sets the the targeted field on the event' do
+          expect(subject).to receive(:request_http).with(anything, config['url'], anything).and_return(response)
+
+          subject.filter(event)
+
+          expect(event.get('[res][status]')).to eq(200)
+        end
       end
 
     end

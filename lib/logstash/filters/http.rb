@@ -33,6 +33,8 @@ class LogStash::Filters::Http < LogStash::Filters::Base
   config :target_body, :validate => :field_reference
   # default [headers] (legacy) or [@metadata][filter][http][response][headers] in ECS mode
   config :target_headers, :validate => :field_reference
+  # default [@metadata][filter][http][response][status_code] in all modes
+  config :target_status, :validate => :field_reference, default: '[@metadata][filter][http][response][status_code]'
 
   # Append values to the `tags` field when there has been no
   # successful match or json parsing error
@@ -85,16 +87,20 @@ class LogStash::Filters::Http < LogStash::Filters::Base
                     :url => url_for_event, :body => body_sprintfed,
                     :client_error => client_error.message)
       @tag_on_request_failure.each { |tag| event.tag(tag) }
-    elsif !code.between?(200, 299)
-      @logger.error('error during HTTP request',
-                    :url => url_for_event, :code => code,
-                    :response => response_body)
-      @tag_on_request_failure.each { |tag| event.tag(tag) }
     else
-      @logger.debug? && @logger.debug('success received',
-                                      :code => code, :body => response_body)
-      process_response(response_body, response_headers, event)
-      filter_matched(event)
+      event.set(@target_status, code)
+      if !code.between?(200, 299)
+        @logger.error('error during HTTP request',
+                      :url => url_for_event, :code => code,
+                      :response => response_body)
+
+        @tag_on_request_failure.each { |tag| event.tag(tag) }
+      else
+        @logger.debug? && @logger.debug('success received',
+                                        :code => code, :body => response_body)
+        process_response(response_body, response_headers, event)
+        filter_matched(event)
+      end
     end
   end # def filter
 

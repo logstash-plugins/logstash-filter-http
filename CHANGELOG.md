@@ -1,3 +1,6 @@
+## 1.5.0
+  - Feat: add http response status code to metadata
+
 ## 1.4.1
   - Fix: don't process response body for HEAD requests [#40](https://github.com/logstash-plugins/logstash-filter-http/pull/40)
 
