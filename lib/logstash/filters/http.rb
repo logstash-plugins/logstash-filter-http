@@ -135,6 +135,7 @@ EOF
     content_type, _ = headers.fetch("content-type", "").split(";")
     event.set(@target_headers, headers)
     return if @verb == 'head' # Since HEAD requests will not contain body, we need to set only header
+    return if body.nil?       # Catch other responses (HTTP 204?) that also do not contain bodies
     if content_type == "application/json"
       begin
         parsed = LogStash::Json.load(body)
