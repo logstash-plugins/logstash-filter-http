@@ -85,16 +85,20 @@ class LogStash::Filters::Http < LogStash::Filters::Base
                     :url => url_for_event, :body => body_sprintfed,
                     :client_error => client_error.message)
       @tag_on_request_failure.each { |tag| event.tag(tag) }
-    elsif !code.between?(200, 299)
+      return
+    else
+      process_response(response_body, response_headers, event)
+    end
+    
+    if code.between?(200, 299)
+      @logger.debug? && @logger.debug('success received',
+                                      :code => code, :body => response_body)
+      filter_matched(event)
+    else
       @logger.error('error during HTTP request',
                     :url => url_for_event, :code => code,
                     :response => response_body)
       @tag_on_request_failure.each { |tag| event.tag(tag) }
-    else
-      @logger.debug? && @logger.debug('success received',
-                                      :code => code, :body => response_body)
-      process_response(response_body, response_headers, event)
-      filter_matched(event)
     end
   end # def filter
 
