@@ -118,6 +118,7 @@ describe LogStash::Filters::Http do
           'Server' => 'Apache',
           'Last-Modified' => 'Mon, 18 Jul 2016 02:36:04 GMT',
           'X-Backend-Server' => 'logstash.elastic.co',
+          'Content-Type' => %w[application/json application/xml]
       }
       [200, response_headers, "Bom dia"]
     end
@@ -136,10 +137,12 @@ describe LogStash::Filters::Http do
         if ecs_select.active_mode == :disabled
           expect(event.get('headers')).to include "Server" => "Apache"
           expect(event.get('headers')).to include "X-Backend-Server" => "logstash.elastic.co"
+          expect(event.get('headers')).to include "Content-Type" => %w[application/json application/xml]
         else
           expect(event.include?('headers')).to be false
           expect(event.get('[@metadata][filter][http][response][headers]')).to include "Server" => "Apache"
           expect(event.get('[@metadata][filter][http][response][headers]')).to include "X-Backend-Server" => "logstash.elastic.co"
+          expect(event.get('[@metadata][filter][http][response][headers]')).to include "Content-Type" => %w[application/json application/xml]
         end
       end
 
@@ -170,6 +173,46 @@ describe LogStash::Filters::Http do
         end.and_return(response)
 
         subject.filter(event)
+      end
+    end
+
+    context "content-type header" do
+      let(:config) { super().merge "headers" => headers }
+
+      describe 'when content-type header is an array' do
+        let(:headers) {{ "Content-type" => %w[application/json logstash/custom-media-type] }}
+
+        it "resolves the content-type" do
+          expect(subject).to receive(:request_http) do |verb, url, options|
+            expect( options.fetch(:headers, {}) ).to include(headers)
+          end.and_return(response)
+
+          expect{ subject.filter(event) }.not_to raise_error
+        end
+      end
+
+      describe 'when content-type header is a string' do
+        let(:headers) {{ "Content-type" => "application/json; logstash/custom-media-type" }}
+
+        it "resolves the content-type" do
+          expect(subject).to receive(:request_http) do |verb, url, options|
+            expect( options.fetch(:headers, {}) ).to include(headers)
+          end.and_return(response)
+
+          expect{ subject.filter(event) }.not_to raise_error
+        end
+      end
+
+      describe 'when content-type header is an empty string' do
+        let(:headers) {{ "Content-type" => "" }}
+
+        it "resolves the content-type" do
+          expect(subject).to receive(:request_http) do |verb, url, options|
+            expect( options.fetch(:headers, {}) ).to include(headers)
+          end.and_return(response)
+
+          expect{ subject.filter(event) }.not_to raise_error
+        end
       end
     end
   end

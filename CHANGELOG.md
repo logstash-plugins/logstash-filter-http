@@ -1,5 +1,8 @@
+## 1.4.2
+  - Fix: resolve content type when a content-type header contains an array [#46](https://github.com/logstash-plugins/logstash-filter-http/pull/46)
+
 ## 1.4.1
-  - Fix: don't process response body for HEAD requests [#40](https://github.com/logstash-plugins/logstash-filter-http/pull/40)
+  - Fix: don't process response body for HEAD requests [#41](https://github.com/logstash-plugins/logstash-filter-http/pull/41)
 
 ## 1.4.0
   - Feat: added ssl_supported_protocols option [#38](https://github.com/logstash-plugins/logstash-filter-http/pull/38)

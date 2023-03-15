@@ -88,11 +88,12 @@ class LogStash::Filters::Http < LogStash::Filters::Base
     elsif !code.between?(200, 299)
       @logger.error('error during HTTP request',
                     :url => url_for_event, :code => code,
+                    :headers => response_headers,
                     :response => response_body)
       @tag_on_request_failure.each { |tag| event.tag(tag) }
     else
       @logger.debug? && @logger.debug('success received',
-                                      :code => code, :body => response_body)
+                                      :code => code, :headers => response_headers, :body => response_body)
       process_response(response_body, response_headers, event)
       filter_matched(event)
     end
@@ -132,9 +133,10 @@ EOF
   end
 
   def process_response(body, headers, event)
-    content_type, _ = headers.fetch("content-type", "").split(";")
     event.set(@target_headers, headers)
     return if @verb == 'head' # Since HEAD requests will not contain body, we need to set only header
+
+    content_type = resolve_content_type(headers)
     if content_type == "application/json"
       begin
         parsed = LogStash::Json.load(body)
@@ -150,6 +152,15 @@ EOF
     else
       event.set(@target_body, body.strip)
     end
+  end
+
+  ##
+  # @param headers [String] or [Array]
+  # @return resolved content-type
+  def resolve_content_type(headers)
+    # content-type might be an array or string with ; separated
+    content_types = headers.fetch("content-type", "")
+    content_types.kind_of?(Array) ? content_types.first : content_types.split(";").first
   end
 
 end # class LogStash::Filters::Rest
