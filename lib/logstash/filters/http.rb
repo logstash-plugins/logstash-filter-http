@@ -158,10 +158,9 @@ EOF
   # @return resolved content-type
   def headers_has_json_content_type?(headers)
     # content-type might be an array or string with ; separated
-    [ headers.fetch("content-type", "") ]
-             .map {|i| i }
-             .flatten
-             .include?("application/json")
+    headers = headers.fetch("content-type", "")
+    headers = headers.kind_of?(Array) ? headers : headers.split(';')
+    headers.map(&:strip).include?("application/json")
   end
 
 end # class LogStash::Filters::Rest
