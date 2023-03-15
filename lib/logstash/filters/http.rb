@@ -136,8 +136,7 @@ EOF
     event.set(@target_headers, headers)
     return if @verb == 'head' # Since HEAD requests will not contain body, we need to set only header
 
-    content_type = resolve_content_type(headers)
-    if content_type == "application/json"
+    if headers_has_json_content_type?(headers)
       begin
         parsed = LogStash::Json.load(body)
         event.set(@target_body, parsed)
@@ -157,10 +156,12 @@ EOF
   ##
   # @param headers [String] or [Array]
   # @return resolved content-type
-  def resolve_content_type(headers)
+  def headers_has_json_content_type?(headers)
     # content-type might be an array or string with ; separated
-    content_types = headers.fetch("content-type", "")
-    content_types.kind_of?(Array) ? content_types.first : content_types.split(";").first
+    [ headers.fetch("content-type", "") ]
+             .map {|i| i }
+             .flatten
+             .include?("application/json")
   end
 
 end # class LogStash::Filters::Rest
