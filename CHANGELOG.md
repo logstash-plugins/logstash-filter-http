@@ -1,3 +1,6 @@
+## 1.4.3
+  - DOC: add clarification on sending data as json [#47](https://github.com/logstash-plugins/logstash-filter-http/pull/47)
+
 ## 1.4.2
   - Fix: resolve content type when a content-type header contains an array [#46](https://github.com/logstash-plugins/logstash-filter-http/pull/46)
 
