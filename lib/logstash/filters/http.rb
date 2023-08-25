@@ -16,7 +16,7 @@ class LogStash::Filters::Http < LogStash::Filters::Base
 
   extend LogStash::PluginMixins::ValidatorSupport::FieldReferenceValidationAdapter
 
-  include LogStash::PluginMixins::HttpClient
+  include LogStash::PluginMixins::HttpClient[:with_deprecated => true]
 
   config_name 'http'
 
