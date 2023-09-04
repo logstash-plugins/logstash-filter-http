@@ -136,6 +136,8 @@ EOF
     event.set(@target_headers, headers)
     return if @verb == 'head' # Since HEAD requests will not contain body, we need to set only header
 
+    return if body.nil? #Return on empty bodys (e.g. 204 response)
+
     if headers_has_json_content_type?(headers)
       begin
         parsed = LogStash::Json.load(body)
