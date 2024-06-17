@@ -383,8 +383,8 @@ Supported cipher suites vary depending on the Java and protocol versions.
 [id="plugins-{type}s-{plugin}-ssl_enabled"]
 ===== `ssl_enabled`
 
-* Value type is <<boolean,boolean>>
-* Default value is `true`
+  * Value type is <<boolean,boolean>>
+  * Default value is `true`
 
 Enable SSL/TLS secured communication. It must be `true` for other `ssl_` options
 to take effect.

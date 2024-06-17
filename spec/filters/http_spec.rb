@@ -61,6 +61,14 @@ describe LogStash::Filters::Http do
         end
       end
 
+      context "when there is no body" do
+        let(:response) { [204, {}, nil] }
+
+        it "doesn't write a body to the event" do
+          expect(event.get('[gw-response]')).to be_nil
+        end
+      end
+
       context 'with body target' do
 
         let(:config) { super().merge "target_body" => '[rest]' }
