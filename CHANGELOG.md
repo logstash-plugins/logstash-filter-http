@@ -1,3 +1,6 @@
+## 1.6.0
+  - Added new `ssl_enabled` setting for enabling/disabling the SSL configurations [#52](https://github.com/logstash-plugins/logstash-filter-http/pull/52)
+
 ## 1.5.1
   - Don't process response when the body is empty. [#50](https://github.com/logstash-plugins/logstash-filter-http/pull/50)
 
