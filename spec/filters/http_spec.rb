@@ -361,6 +361,31 @@ describe LogStash::Filters::Http do
   end
 end
 
+describe "obsolete settings" do
+  let(:url) { 'https://a-non-existent.url1' }
+  let(:config) { { "url" => url, 'target_body' => '[the][body]' } }
+
+  [{:name => 'cacert', :canonical_name => 'ssl_certificate_authorities'},
+   {:name => 'client_cert', :canonical_name => 'ssl_certificate'},
+   {:name => 'client_key', :canonical_name => 'ssl_key'},
+   {:name => "keystore", :canonical_name => 'ssl_keystore_path'},
+   {:name => 'truststore', :canonical_name => 'ssl_truststore_path'},
+   {:name => "keystore_password", :canonical_name => "ssl_keystore_password"},
+   {:name => 'truststore_password', :canonical_name => "ssl_truststore_password"},
+   {:name => "keystore_type", :canonical_name => "ssl_keystore_type"},
+   {:name => 'truststore_type', :canonical_name => 'ssl_truststore_type'}
+  ].each do |settings|
+    context "with option #{settings[:name]}" do
+      let(:obsolete_config) { config.merge(settings[:name] => 'test_value') }
+
+      it "emits an error about the setting `#{settings[:name]}` now being obsolete and provides guidance to use `#{settings[:canonical_name]}`" do
+        error_text = /The setting `#{settings[:name]}` in plugin `http` is obsolete and is no longer available. Use `#{settings[:canonical_name]}` instead/i
+        expect { LogStash::Filters::Http.new(obsolete_config) }.to raise_error LogStash::ConfigurationError, error_text
+      end
+
+    end
+  end
+end
 =begin
   # TODO refactor remaning tests to avoid whole pipeline instantiation
   describe 'empty response' do
