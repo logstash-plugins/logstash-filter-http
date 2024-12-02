@@ -464,7 +464,7 @@ The plugin will fail to start if it contains any of these obsolete options.
 | client_key |<<plugins-{type}s-{plugin}-ssl_key>>
 | keystore |<<plugins-{type}s-{plugin}-ssl_keystore_path>>
 | keystore_password |<<plugins-{type}s-{plugin}-ssl_keystore_password>>
-| keystore_type |<<plugins-{type}s-{plugin}-ssl_keystore_password>>
+| keystore_type |<<plugins-{type}s-{plugin}-ssl_keystore_type>>
 | truststore |<<plugins-{type}s-{plugin}-ssl_truststore_path>>
 | truststore_password |<<plugins-{type}s-{plugin}-ssl_truststore_password>>
 | truststore_type |<<plugins-{type}s-{plugin}-ssl_truststore_type>>

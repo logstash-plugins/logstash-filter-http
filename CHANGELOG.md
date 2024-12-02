@@ -6,7 +6,7 @@
     - `client_key`, which should be replaced by `ssl_key`
     - `keystore`, which should be replaced by `ssl_keystore_path`
     - `keystore_password`, which should be replaced by `ssl_keystore_password`
-    - `keystore_type`, which should be replaced by `ssl_keystore_password`
+    - `keystore_type`, which should be replaced by `ssl_keystore_type`
     - `truststore`, which should be replaced by `ssl_truststore_path>`
     - `truststore_password`, which should be replaced by `ssl_truststore_password`
     - `truststore_type`, which should be replaced by `ssl_truststore_type`
