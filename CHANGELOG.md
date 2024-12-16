@@ -1,5 +1,5 @@
 ## 2.0.0
-- SSL settings that were marked deprecated in version `1.6.0` are now marked obsolete, and will prevent the plugin from starting.
+  - SSL settings that were marked deprecated in version `1.6.0` are now marked obsolete, and will prevent the plugin from starting.
     - These settings are:
     - `cacert`, which should be replaced by `ssl_certificate_authorities`
     - `client_cert`, which should be replaced by `ssl_certificate`
