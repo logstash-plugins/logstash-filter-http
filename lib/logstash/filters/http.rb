@@ -33,6 +33,17 @@ class LogStash::Filters::Http < LogStash::Filters::Base
   config :target_body, :validate => :field_reference
   # default [headers] (legacy) or [@metadata][filter][http][response][headers] in ECS mode
   config :target_headers, :validate => :field_reference
+  
+  # New configuration for status code field
+  # default [@metadata][filter][http][response][status_code] in ECS mode or [@metadata][http_status_code] in legacy
+  config :target_status_code, :validate => :field_reference
+  
+  # Configuration to control whether to include response body on failure
+  # Default is true 
+  config :include_body_on_failure, :validate => :boolean, :default => true
+  
+  # Configuration to control whether to include status code always
+  config :include_status_code, :validate => :boolean, :default => true
 
   # Append values to the `tags` field when there has been no
   # successful match or json parsing error
@@ -49,6 +60,10 @@ class LogStash::Filters::Http < LogStash::Filters::Base
     end
 
     @target_headers ||= ecs_select[disabled: '[headers]', v1: '[@metadata][filter][http][response][headers]']
+    
+    # Initialize target_status_code with sensible defaults
+    @target_status_code ||= ecs_select[disabled: '[@metadata][http_status_code]', 
+                                       v1: '[@metadata][filter][http][response][status_code]']
   end
 
   def register
@@ -73,6 +88,9 @@ class LogStash::Filters::Http < LogStash::Filters::Base
 
     @logger.debug? && @logger.debug('processing request', :url => url_for_event, :headers => headers_sprintfed, :query => query_sprintfed)
     client_error = nil
+    code = nil
+    response_headers = nil
+    response_body = nil
 
     begin
       code, response_headers, response_body = request_http(@verb, url_for_event, options)
@@ -85,16 +103,50 @@ class LogStash::Filters::Http < LogStash::Filters::Base
                     :url => url_for_event, :body => body_sprintfed,
                     :client_error => client_error.message)
       @tag_on_request_failure.each { |tag| event.tag(tag) }
+      
+      # Set error information in metadata
+      if @include_status_code && @target_status_code
+        # Set status code as 0 or nil to indicate connection/client error
+        event.set(@target_status_code, 0)
+      end
+      
+      # Optionally set error message in body for client errors
+      if @include_body_on_failure && @target_body
+        error_response = {
+          "error" => "client_error",
+          "message" => client_error.message,
+          "url" => url_for_event
+        }
+        event.set(@target_body, error_response)
+      end
+      
     elsif !code.between?(200, 299)
       @logger.error('error during HTTP request',
                     :url => url_for_event, :code => code,
                     :headers => response_headers,
                     :response => response_body)
       @tag_on_request_failure.each { |tag| event.tag(tag) }
+      
+      # Set status code even for failure responses
+      if @include_status_code && @target_status_code
+        event.set(@target_status_code, code)
+      end
+      
+      # Process response body even for failure status codes
+      if @include_body_on_failure
+        process_response(response_body, response_headers, event, true)
+      end
+      
     else
       @logger.debug? && @logger.debug('success received',
                                       :code => code, :headers => response_headers, :body => response_body)
-      process_response(response_body, response_headers, event)
+      
+      # Set status code for successful responses
+      if @include_status_code && @target_status_code
+        event.set(@target_status_code, code)
+      end
+      
+      process_response(response_body, response_headers, event, false)
       filter_matched(event)
     end
   end # def filter
@@ -132,7 +184,7 @@ EOF
     end
   end
 
-  def process_response(body, headers, event)
+  def process_response(body, headers, event, is_error_response = false)
     event.set(@target_headers, headers)
     return if @verb == 'head' # Since HEAD requests will not contain body, we need to set only header
 
@@ -148,7 +200,12 @@ EOF
         else
           @logger.warn('JSON parsing error', :message => e.message)
         end
-        @tag_on_json_failure.each { |tag| event.tag(tag) }
+        # Only tag JSON failures for successful responses to avoid double tagging
+        if !is_error_response
+          @tag_on_json_failure.each { |tag| event.tag(tag) }
+        end
+        # Still set the raw body if JSON parsing fails
+        event.set(@target_body, body.strip)
       end
     else
       event.set(@target_body, body.strip)
