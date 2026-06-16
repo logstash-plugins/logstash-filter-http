@@ -27,7 +27,7 @@ The HTTP filter provides integration with external web services/REST APIs.
 
 The plugin includes sensible defaults that change based on <<plugins-{type}s-{plugin}-ecs_compatibility,ECS compatibility mode>>.
 When targeting an ECS version, headers are set as `@metadata` and the `target_body` is a required option.
-See <<plugins-{type}s-{plugin}-target_body>>, and <<plugins-{type}s-{plugin}-target_headers>>.
+See <<plugins-{type}s-{plugin}-target_body>>, <<plugins-{type}s-{plugin}-target_headers>>, and <<plugins-{type}s-{plugin}-target_status_code>>.
 
 
 [id="plugins-{type}s-{plugin}-options"]
@@ -45,9 +45,12 @@ Please check out <<plugins-{type}s-{plugin}-obsolete-options>> for details.
 | <<plugins-{type}s-{plugin}-body_format>> |<<string,string>>|No
 | <<plugins-{type}s-{plugin}-ecs_compatibility>> |<<string,string>>|No
 | <<plugins-{type}s-{plugin}-headers>> |<<hash,hash>>|No
+| <<plugins-{type}s-{plugin}-include_body_on_failure>> |<<boolean,boolean>>|No
+| <<plugins-{type}s-{plugin}-include_status_code>> |<<boolean,boolean>>|No
 | <<plugins-{type}s-{plugin}-query>> |<<hash,hash>>|No
 | <<plugins-{type}s-{plugin}-target_body>> |<<string,string>>|No
 | <<plugins-{type}s-{plugin}-target_headers>> |<<string,string>>|No
+| <<plugins-{type}s-{plugin}-target_status_code>> |<<string,string>>|No
 | <<plugins-{type}s-{plugin}-url>> |<<string,string>>|Yes
 | <<plugins-{type}s-{plugin}-verb>> |<<string,string>>|No
 |=======================================================================
@@ -129,8 +132,8 @@ If set to `"json"` and the <<plugins-{type}s-{plugin}-body>> is a type of <<arra
     ** Otherwise, the default value is `disabled`.
 
 Controls this plugin's compatibility with the {ecs-ref}[Elastic Common Schema (ECS)].
-The value of this setting affects the _default_ value of <<plugins-{type}s-{plugin}-target_body>> and
-<<plugins-{type}s-{plugin}-target_headers>>.
+The value of this setting affects the _default_ value of <<plugins-{type}s-{plugin}-target_body>>,
+<<plugins-{type}s-{plugin}-target_headers>>, and <<plugins-{type}s-{plugin}-target_status_code>>.
 
 
 [id="plugins-{type}s-{plugin}-headers"]
@@ -141,6 +144,53 @@ The value of this setting affects the _default_ value of <<plugins-{type}s-{plug
 
 The HTTP headers to be sent in the request. Both the names of the headers and their
 values can reference values from event fields.
+
+[id="plugins-{type}s-{plugin}-include_body_on_failure"]
+===== `include_body_on_failure`
+
+  * Value type is <<boolean,boolean>>
+  * Default value is `true`
+
+When enabled, the plugin will capture and store the response body even for non-2xx HTTP status codes.
+This is useful for debugging and error handling, as error responses often contain valuable information
+about what went wrong.
+
+Example usage:
+```
+http {
+  url => "https://api.example.com/endpoint"
+  include_body_on_failure => true
+  target_body => "[http_response][body]"
+}
+```
+
+When a request fails with a 4xx or 5xx status code, the response body will still be available in the
+`target_body` field. For connection errors (timeouts, connection refused, etc.), a structured error
+message will be stored instead.
+
+[id="plugins-{type}s-{plugin}-include_status_code"]
+===== `include_status_code`
+
+  * Value type is <<boolean,boolean>>
+  * Default value is `true`
+
+When enabled, the plugin will capture and store the HTTP status code for all responses, including
+successful, failed, and error responses. This allows for better monitoring and conditional processing
+in subsequent filters.
+
+Example usage:
+```
+http {
+  url => "https://api.example.com/endpoint"
+  include_status_code => true
+  target_status_code => "[@metadata][http_status]"
+}
+```
+
+Status codes are stored as follows:
+* **2xx responses**: The actual status code (e.g., 200, 201, 204)
+* **Non-2xx responses**: The actual status code (e.g., 400, 404, 500, 503)
+* **Connection errors**: Status code is set to `0` to indicate a connection/client error
 
 [id="plugins-{type}s-{plugin}-query"]
 ===== `query`
@@ -153,22 +203,59 @@ Define the query string parameters (key-value pairs) to be sent in the HTTP requ
 [id="plugins-{type}s-{plugin}-target_body"]
 ===== `target_body`
 
-  * Value type is <<hash,hash>>
+  * Value type is <<string,string>>
   * Default value depends on whether <<plugins-{type}s-{plugin}-ecs_compatibility>> is enabled:
-    ** ECS Compatibility disabled: `"[body]"
+    ** ECS Compatibility disabled: `"[body]"`
     ** ECS Compatibility enabled: no default value, needs to be specified explicitly
 
 Define the target field for placing the body of the HTTP response.
 
+When <<plugins-{type}s-{plugin}-include_body_on_failure>> is enabled (default), this field will contain:
+* **For successful responses (2xx)**: The response body from the server
+* **For error responses (4xx, 5xx)**: The error response body from the server (if available)
+* **For connection errors**: A structured error message with error details
+
 [id="plugins-{type}s-{plugin}-target_headers"]
 ===== `target_headers`
 
-  * Value type is <<hash,hash>>
+  * Value type is <<string,string>>
   * Default value depends on whether <<plugins-{type}s-{plugin}-ecs_compatibility>> is enabled:
     ** ECS Compatibility disabled: `"[headers]"`
     ** ECS Compatibility enabled: `"[@metadata][filter][http][response][headers]"`
 
 Define the target field for placing the headers of the HTTP response.
+
+[id="plugins-{type}s-{plugin}-target_status_code"]
+===== `target_status_code`
+
+  * Value type is <<string,string>>
+  * Default value depends on whether <<plugins-{type}s-{plugin}-ecs_compatibility>> is enabled:
+    ** ECS Compatibility disabled: `"[@metadata][http_status_code]"`
+    ** ECS Compatibility enabled: `"[@metadata][filter][http][response][status_code]"`
+
+Define the target field for storing the HTTP status code of the response.
+
+This field is populated when <<plugins-{type}s-{plugin}-include_status_code>> is enabled (default).
+The status code can be used for conditional processing, monitoring, and debugging.
+
+Example usage:
+```
+filter {
+  http {
+    url => "https://api.example.com/endpoint"
+    target_status_code => "[http][status]"
+    target_body => "[http][response]"
+  }
+  
+  # Use the status code for conditional processing
+  if [http][status] and [http][status] >= 400 {
+    mutate {
+      add_tag => [ "http_error" ]
+      add_field => { "error_status" => "%{[http][status]}" }
+    }
+  }
+}
+```
 
 [id="plugins-{type}s-{plugin}-url"]
 ===== `url`
@@ -415,9 +502,9 @@ The format of the truststore file. It must be either `jks` or `pkcs12`.
 
 Controls the verification of server certificates.
 The `full` option verifies that the provided certificate is signed by a trusted authority (CA)
-and also that the server’s hostname (or IP address) matches the names identified within the certificate.
+and also that the server's hostname (or IP address) matches the names identified within the certificate.
 
-The `none` setting performs no verification of the server’s certificate.
+The `none` setting performs no verification of the server's certificate.
 This mode disables many of the security benefits of SSL/TLS and should only be used after cautious consideration.
 It is primarily intended as a temporary diagnostic mechanism when attempting to resolve TLS errors.
 Using `none`  in production environments is strongly discouraged.
@@ -448,7 +535,66 @@ being leased to the consumer. Non-positive value passed to this method disables
 connection validation. This check helps detect connections that have become
 stale (half-closed) while kept inactive in the pool."
 
+[id="plugins-{type}s-{plugin}-examples"]
+==== HTTP Filter Examples
 
+===== Capturing Error Responses
+
+This example shows how to capture and process error responses from an API:
+
+```
+filter {
+  http {
+    url => "https://api.example.com/users/%{[user_id]}"
+    verb => "GET"
+    target_body => "[api_response]"
+    target_status_code => "[api_status]"
+    target_headers => "[@metadata][api_headers]"
+    include_body_on_failure => true
+  }
+  
+  # Process based on status code
+  if [api_status] {
+    if [api_status] >= 400 and [api_status] < 500 {
+      mutate {
+        add_tag => [ "client_error" ]
+        add_field => { 
+          "error_type" => "client_error"
+          "error_message" => "%{[api_response][error]}"
+        }
+      }
+    } else if [api_status] >= 500 {
+      mutate {
+        add_tag => [ "server_error" ]
+        add_field => { "error_type" => "server_error" }
+      }
+    }
+  }
+}
+```
+
+===== Handling Connection Errors
+
+When connection errors occur, the status code is set to 0:
+
+```
+filter {
+  http {
+    url => "https://api.example.com/endpoint"
+    target_body => "[response]"
+    target_status_code => "[@metadata][status]"
+  }
+  
+  if [@metadata][status] == 0 {
+    mutate {
+      add_tag => [ "connection_error" ]
+      add_field => { 
+        "alert" => "API connection failed"
+      }
+    }
+  }
+}
+```
 
 [id="plugins-{type}s-{plugin}-obsolete-options"]
 ==== HTTP Filter Obsolete Configuration Options
