@@ -20,7 +20,37 @@ include::{include_path}/plugin_header.asciidoc[]
 
 ==== Description
 
-The HTTP filter provides integration with external web services/REST APIs.
+The HTTP filter integrates with external web services/REST APIs, and enables
+lookup enrichment against any HTTP service or endpoint. This plugin is well
+suited for many enrichment use cases, such as social APIs, sentiment APIs,
+security feed APIs, and business service APIs.
+
+*Sample*
+
+[source,txt]
+-----
+http {
+    url => "https://neutrinoapi.com/convert"
+    body => {
+      "user-id" => "auser"
+      "api-key" => "anapikey"
+      "from-value" => "%{millimeters}"
+      "from-type" => "mm"
+      "to-type" => "inch"
+    }
+    verb => "POST"
+    body_format => "json"
+    target_body => "neutrinoapi_convert_mm_to_in"
+    add_tag => ["from_api"]
+    id => "http-neutrino-lookup"
+  }
+  mutate {
+    # needed because the neutrino response JSON object includes unneeded extra key/values
+    copy => {"[neutrinoapi_convert_mm_to_in][result]" => "[inches]"}
+    remove_field => ["neutrinoapi_convert_mm_to_in"]
+    id => "copy-to-inches"
+  }
+-----
 
 [id="plugins-{type}s-{plugin}-ecs"]
 ==== Compatibility with the Elastic Common Schema (ECS)
