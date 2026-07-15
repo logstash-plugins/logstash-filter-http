@@ -18,7 +18,8 @@ Gem::Specification.new do |s|
                 'CONTRIBUTORS',
                 'Gemfile',
                 'LICENSE',
-                'NOTICE.TXT']
+                'NOTICE.TXT',
+                'version']
   # Tests
   s.test_files = s.files.grep(%r{^(test|spec|features)/})
 
